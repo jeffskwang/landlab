@@ -178,6 +178,8 @@ class ChiFinder(Component):
         reference_area=1.0,
         use_true_dx=False,
         clobber=False,
+        heterogenous=False,
+        uplift = 0.0
     ):
         """
         Parameters
@@ -227,6 +229,9 @@ class ChiFinder(Component):
         self._chi = self._grid.add_zeros("node", "channel__chi_index", clobber=clobber)
         self._mask = self._grid.ones("node", dtype=bool)
         self._elev = self._grid.at_node["topographic__elevation"]
+        
+        self._heterogenous = heterogenous
+        self._uplift = uplift
 
     def _set_up_reference_area(self, reference_area):
         """Set up and validate reference_area."""
@@ -251,6 +256,8 @@ class ChiFinder(Component):
         reftheta = self._reftheta
         min_drainage = self._min_drainage
         reference_area = self._A0
+        uplift = self._uplift
+        heterogenous = self._heterogenous
         self._set_up_reference_area(reference_area)
 
         use_true_dx = self._use_true_dx
@@ -261,18 +268,29 @@ class ChiFinder(Component):
             self._grid.at_node["drainage_area"][upstr_order] >= min_drainage
         ]
         valid_upstr_areas = self._grid.at_node["drainage_area"][valid_upstr_order]
-        if not use_true_dx:
-            chi_integrand = (self._A0 / valid_upstr_areas) ** reftheta
-            mean_dx = self.mean_channel_node_spacing(valid_upstr_order)
-            self.integrate_chi_avg_dx(
-                valid_upstr_order, chi_integrand, self._chi, mean_dx
-            )
+        if heterogenous == True:
+            valid_upstr_ksp =  self._grid.at_node['K_sp'][valid_upstr_order]
+            if not use_true_dx:
+                chi_integrand = (1.0 / valid_upstr_areas) ** reftheta * (uplift / valid_upstr_ksp)
+                mean_dx = self.mean_channel_node_spacing(valid_upstr_order)
+                self.integrate_chi_avg_dx(
+                    valid_upstr_order, chi_integrand, self._chi, mean_dx
+                )
+            else:
+                chi_integrand = self._grid.zeros("node")
+                chi_integrand[valid_upstr_order] = (1.0 / valid_upstr_areas) ** reftheta * (uplift / valid_upstr_ksp)
+                self.integrate_chi_each_dx(valid_upstr_order, chi_integrand, self._chi)
         else:
-            chi_integrand = self._grid.zeros("node")
-            chi_integrand[valid_upstr_order] = (
-                self._A0 / valid_upstr_areas
-            ) ** reftheta
-            self.integrate_chi_each_dx(valid_upstr_order, chi_integrand, self._chi)
+            if not use_true_dx:
+                chi_integrand = (self._A0 / valid_upstr_areas) ** reftheta
+                mean_dx = self.mean_channel_node_spacing(valid_upstr_order)
+                self.integrate_chi_avg_dx(
+                    valid_upstr_order, chi_integrand, self._chi, mean_dx
+                )
+            else:
+                chi_integrand = self._grid.zeros("node")
+                chi_integrand[valid_upstr_order] = (self._A0 / valid_upstr_areas) ** reftheta
+                self.integrate_chi_each_dx(valid_upstr_order, chi_integrand, self._chi)
         # stamp over the closed nodes, as it's possible they can receive infs
         # if min_drainage_area < grid.cell_area_at_node
         self._chi[self._grid.status_at_node == self._grid.BC_NODE_IS_CLOSED] = 0.0
