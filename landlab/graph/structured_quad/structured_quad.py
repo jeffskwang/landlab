@@ -1,8 +1,9 @@
 from abc import ABC, abstractmethod
-from functools import lru_cache
+from functools import cached_property
 
 import numpy as np
 
+from ...grid.linkorientation import LinkOrientation
 from ...utils.decorators import read_only_array
 from ..graph import Graph
 
@@ -13,38 +14,47 @@ class StructuredQuadLayout(ABC):
         n_rows, n_cols = shape
         return (n_rows * n_cols - 1, (n_rows - 1) * n_cols, 0, n_cols - 1)
 
+    @staticmethod
     @abstractmethod
     def links_at_patch(shape):
         ...
 
+    @staticmethod
     @abstractmethod
     def nodes_at_link(shape):
         ...
 
+    @staticmethod
     @abstractmethod
     def horizontal_links(shape):
         ...
 
+    @staticmethod
     @abstractmethod
     def vertical_links(shape):
         ...
 
+    @staticmethod
     @abstractmethod
     def perimeter_nodes(shape):
         ...
 
+    @staticmethod
     @abstractmethod
     def links_at_node(shape):
         ...
 
+    @staticmethod
     @abstractmethod
     def patches_at_link(shape):
         ...
 
+    @staticmethod
     @abstractmethod
     def link_dirs_at_node(shape):
         ...
 
+    @staticmethod
     @abstractmethod
     def patches_at_node(shape):
         ...
@@ -389,8 +399,7 @@ class StructuredQuadGraphTopology:
     def number_of_node_columns(self):
         return self._shape[1]
 
-    @property
-    @lru_cache()
+    @cached_property
     @read_only_array
     def nodes(self):
         """A shaped array of node ids.
@@ -403,26 +412,22 @@ class StructuredQuadGraphTopology:
         """
         return np.arange(self.shape[0] * self.shape[1]).reshape(self.shape)
 
-    @property
-    @lru_cache()
+    @cached_property
     @read_only_array
     def nodes_at_right_edge(self):
         return np.arange(self.shape[1] - 1, np.prod(self.shape), self.shape[1])
 
-    @property
-    @lru_cache()
+    @cached_property
     @read_only_array
     def nodes_at_top_edge(self):
         return np.arange(self.number_of_nodes - self.shape[1], np.prod(self.shape))
 
-    @property
-    @lru_cache()
+    @cached_property
     @read_only_array
     def nodes_at_left_edge(self):
         return np.arange(0, np.prod(self.shape), self.shape[1])
 
-    @property
-    @lru_cache()
+    @cached_property
     @read_only_array
     def nodes_at_bottom_edge(self):
         return np.arange(self.shape[1])
@@ -430,7 +435,7 @@ class StructuredQuadGraphTopology:
     def nodes_at_edge(self, edge):
         if edge not in ("right", "top", "left", "bottom"):
             raise ValueError("value for edge not understood")
-        return getattr(self, "nodes_at_{edge}_edge".format(edge=edge))
+        return getattr(self, f"nodes_at_{edge}_edge")
 
     @property
     def nodes_at_corners_of_grid(self):
@@ -458,19 +463,16 @@ class StructuredQuadGraphTopology:
             self.number_of_node_columns - 1,
         )
 
-    @property
-    @lru_cache()
+    @cached_property
     @read_only_array
     def nodes_at_link(self):
         return self._layout.nodes_at_link(self.shape)
 
-    @property
-    @lru_cache()
+    @cached_property
     def horizontal_links(self):
         return self._layout.horizontal_links(self.shape)
 
-    @property
-    @lru_cache()
+    @cached_property
     def vertical_links(self):
         return self._layout.vertical_links(self.shape)
 
@@ -481,29 +483,24 @@ class StructuredQuadGraphTopology:
             (n_rows * n_cols - 1, (n_rows - 1) * n_cols, 0, n_cols - 1), dtype=int
         )
 
-    @property
-    @lru_cache()
+    @cached_property
     def perimeter_nodes(self):
         return self._layout.perimeter_nodes(self.shape)
 
-    @property
-    @lru_cache()
+    @cached_property
     def links_at_node(self):
         return self._layout.links_at_node(self.shape)
 
-    @property
-    @lru_cache()
+    @cached_property
     def link_dirs_at_node(self):
         return self._layout.link_dirs_at_node(self.shape)
 
-    @property
-    @lru_cache()
+    @cached_property
     @read_only_array
     def patches_at_link(self):
         return self._layout.patches_at_link(self.shape)
 
-    @property
-    @lru_cache()
+    @cached_property
     @read_only_array
     def patches_at_node(self):
         return self._layout.patches_at_node(self.shape)
@@ -523,6 +520,102 @@ class StructuredQuadGraphExtras(StructuredQuadGraphTopology, Graph):
     @property
     def nodes_at_link(self):
         return self.ds["nodes_at_link"].values
+
+    @cached_property
+    def orientation_of_link(self):
+        """Return array of link orientation codes (one value per link).
+
+        Orientation codes are defined by :class:`~.LinkOrientation`;
+        1 = E, 2 = ENE, 4 = NNE, 8 = N, 16 = NNW, 32 = ESE (using powers
+        of 2 allows for future applications that might want additive
+        combinations).
+        """
+        orientation_of_link = np.full(
+            self.number_of_links, LinkOrientation.E, dtype=np.uint8
+        )
+        orientation_of_link[self.vertical_links] = LinkOrientation.N
+        return orientation_of_link
+
+    @cached_property
+    def parallel_links_at_link(self):
+        """Return similarly oriented links connected to each link.
+
+        Return IDs of links of the same orientation that are connected to
+        each given link's tail or head node.
+
+        The data structure is a *numpy* array of shape ``(n_links, 2)`` containing the
+        IDs of the "tail-wise" (connected to tail node) and "head-wise" (connected to
+        head node) links, or -1 if the link is inactive (e.g., on the perimeter) or
+        it has no attached parallel neighbor in the given direction.
+
+        For instance, consider a 3x4 raster, in which link IDs are as shown::
+
+            .-14-.-15-.-16-.
+            |    |    |    |
+            10  11   12   13
+            |    |    |    |
+            .--7-.--8-.--9-.
+            |    |    |    |
+            3    4    5    6
+            |    |    |    |
+            .--0-.--1-.--2-.
+
+        Here's a mapping of the tail-wise (shown at left or bottom of links) and
+        head-wise (shown at right or top of links) links::
+
+            .----.----.----.
+            |    |    |    |
+            |    |    |    |
+            |    4    5    |
+            .---8.7--9.8---.
+            |   11   12    |
+            |    |    |    |
+            |    |    |    |
+            .----.----.----.
+
+        So the corresponding data structure would be mostly filled with -1, but
+        for the 7 active links, it would look like::
+
+            4: [[-1, 11],
+            5:  [-1, 12],
+            7:  [-1,  8],
+            8:  [ 7,  9],
+            9:  [ 8, -1],
+            11: [ 4, -1],
+            12: [ 5, -1]]
+
+        Examples
+        --------
+        >>> from landlab import RasterModelGrid
+        >>> grid = RasterModelGrid((3, 4))
+        >>> pll = grid.parallel_links_at_link
+        >>> pll[4:13, :]
+        array([[-1, 11],
+               [-1, 12],
+               [-1, -1],
+               [-1,  8],
+               [ 7,  9],
+               [ 8, -1],
+               [-1, -1],
+               [ 4, -1],
+               [ 5, -1]])
+        """
+        plinks_at_link = np.full((self.number_of_links, 2), -1, dtype=int)
+
+        plinks_at_link[self.vertical_links, 0] = self.links_at_node[
+            self.node_at_link_tail[self.vertical_links], 3
+        ]
+        plinks_at_link[self.vertical_links, 1] = self.links_at_node[
+            self.node_at_link_head[self.vertical_links], 1
+        ]
+        plinks_at_link[self.horizontal_links, 0] = self.links_at_node[
+            self.node_at_link_tail[self.horizontal_links], 2
+        ]
+        plinks_at_link[self.horizontal_links, 1] = self.links_at_node[
+            self.node_at_link_head[self.horizontal_links], 0
+        ]
+
+        return plinks_at_link
 
 
 class StructuredQuadGraph(StructuredQuadGraphExtras):
