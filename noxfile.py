@@ -12,6 +12,10 @@ ROOT = pathlib.Path(__file__).parent
 @nox.session(venv_backend="mamba")
 def test(session: nox.Session) -> None:
     """Run the tests."""
+    os.environ["WITH_OPENMP"] = "1"
+
+    # session.conda_install("c-compiler", "cxx-compiler")
+    session.log(f"CC = {os.environ.get('CC', 'NOT FOUND')}")
     session.conda_install("--file", "requirements.in")
     session.conda_install("--file", "requirements-testing.in")
     session.conda_install("richdem")
@@ -48,16 +52,22 @@ def test_notebooks(session: nox.Session) -> None:
         "-vvv",
     ] + session.posargs
 
-    session.install("git+https://github.com/mcflugen/nbmake.git@mcflugen/add-markers")
-    session.conda_install("richdem")
+    os.environ["WITH_OPENMP"] = "1"
+
+    # session.conda_install("c-compiler", "cxx-compiler")
+    session.conda_install("richdem", channel=["nodefaults", "conda-forge"])
     session.conda_install(
         "pytest",
         "pytest-xdist",
         "--file",
         "notebooks/requirements.in",
         "--file",
+        "requirements-testing.in",
+        "--file",
         "requirements.in",
+        channel=["nodefaults", "conda-forge"],
     )
+    session.install("git+https://github.com/mcflugen/nbmake.git@mcflugen/add-markers")
     session.install("-e", ".", "--no-deps")
 
     session.run(*args)
