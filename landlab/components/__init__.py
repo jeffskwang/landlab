@@ -26,7 +26,7 @@ from .hack_calculator import HackCalculator
 from .hand_calculator import HeightAboveDrainageCalculator
 from .lake_fill import LakeMapperBarnes
 from .landslides import LandslideProbability
-from .lateral_erosion import LateralEroder
+from .lateral_erosion import LateralEroder, LateralEroderSolo
 from .lithology import LithoLayers, Lithology
 from .marine_sediment_transport import SimpleSubmarineDiffuser
 from .network_sediment_transporter import NetworkSedimentTransporter
@@ -48,7 +48,7 @@ from .profiler import ChannelProfiler, Profiler, TrickleDownProfiler
 from .radiation import Radiation
 from .sink_fill import SinkFiller, SinkFillerBarnes
 from .soil_moisture import SoilInfiltrationGreenAmpt, SoilMoisture
-from .space import Space, SpaceLargeScaleEroder
+from .space import Space, SpaceLargeScaleEroder, SpaceLateralEroder
 from .spatial_precip import SpatialPrecipitationDistribution
 from .species_evolution import SpeciesEvolver
 from .steepness_index import SteepnessFinder
@@ -103,6 +103,7 @@ COMPONENTS = [
     LakeMapperBarnes,
     LandslideProbability,
     LateralEroder,
+    LateralEroderSolo,
     LinearDiffuser,
     LinearDiffusionOverlandFlowRouter,
     ListricKinematicExtender,
@@ -127,6 +128,7 @@ COMPONENTS = [
     SoilInfiltrationGreenAmpt,
     Space,
     SpaceLargeScaleEroder,
+    SpaceLateralEroder,
     SpatialPrecipitationDistribution,
     SpeciesEvolver,
     SteepnessFinder,

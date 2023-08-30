@@ -176,10 +176,11 @@ class ChiFinder(Component):
         reference_concavity=0.5,
         min_drainage_area=1.0e6,
         reference_area=1.0,
+        reference_erodibility=0.00001,
         use_true_dx=False,
         clobber=False,
+        slope_exponent=1.0,
         heterogenous=False,
-        uplift = 0.0
     ):
         """
         Parameters
@@ -201,6 +202,10 @@ class ChiFinder(Component):
             node spacing along the all channels is assumed everywhere.
         clobber : bool (default False)
             Raise an exception if adding an already existing field.
+        heterogenous : bool (default False)
+            User specifies if there are multiple lithologies
+        reference_erodibility : float or None (m**2)
+            reference erodibility when there are multiple lithlogies, keeps chi is units of length
 
         """
         super().__init__(grid)
@@ -221,6 +226,7 @@ class ChiFinder(Component):
             self._link_lengths = self._grid.length_of_link  # not tested
 
         self._reftheta = reference_concavity
+        self._n = slope_exponent
         self._min_drainage = min_drainage_area
 
         self._set_up_reference_area(reference_area)
@@ -231,7 +237,7 @@ class ChiFinder(Component):
         self._elev = self._grid.at_node["topographic__elevation"]
         
         self._heterogenous = heterogenous
-        self._uplift = uplift
+        self._set_up_reference_erodibility(reference_erodibility)
 
     def _set_up_reference_area(self, reference_area):
         """Set up and validate reference_area."""
@@ -240,6 +246,14 @@ class ChiFinder(Component):
                 "ChiFinder: reference_area must be positive."
             )  # not tested
         self._A0 = reference_area
+
+    def _set_up_reference_erodibility(self, reference_erodibility):
+        """Set up and validate reference_area."""
+        if reference_erodibility <= 0.0:
+            raise ValueError(
+                "ChiFinder: reference_erodibility must be positive."
+            )  # not tested
+        self._K0 = reference_erodibility
 
     def calculate_chi(self):
         """Calculate local chi indices.
@@ -256,9 +270,10 @@ class ChiFinder(Component):
         reftheta = self._reftheta
         min_drainage = self._min_drainage
         reference_area = self._A0
-        uplift = self._uplift
+        reference_erodibility = self._K0
         heterogenous = self._heterogenous
         self._set_up_reference_area(reference_area)
+        self._set_up_reference_erodibility(reference_erodibility)
 
         use_true_dx = self._use_true_dx
 
@@ -268,17 +283,17 @@ class ChiFinder(Component):
             self._grid.at_node["drainage_area"][upstr_order] >= min_drainage
         ]
         valid_upstr_areas = self._grid.at_node["drainage_area"][valid_upstr_order]
-        if heterogenous == True:
+        if heterogenous == True: #Update to allow for 
             valid_upstr_ksp =  self._grid.at_node['K_sp'][valid_upstr_order]
             if not use_true_dx:
-                chi_integrand = (1.0 / valid_upstr_areas) ** reftheta * (uplift / valid_upstr_ksp)
+                chi_integrand = (self._A0 / valid_upstr_areas) ** reftheta * (self._K0 / valid_upstr_ksp) ** (1./self._n)
                 mean_dx = self.mean_channel_node_spacing(valid_upstr_order)
                 self.integrate_chi_avg_dx(
                     valid_upstr_order, chi_integrand, self._chi, mean_dx
                 )
             else:
                 chi_integrand = self._grid.zeros("node")
-                chi_integrand[valid_upstr_order] = (1.0 / valid_upstr_areas) ** reftheta * (uplift / valid_upstr_ksp)
+                chi_integrand[valid_upstr_order] = (self._A0 / valid_upstr_areas) ** reftheta * (self._K0 / valid_upstr_ksp) ** (1./self._n)
                 self.integrate_chi_each_dx(valid_upstr_order, chi_integrand, self._chi)
         else:
             if not use_true_dx:
