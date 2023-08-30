@@ -256,7 +256,7 @@ def reindex_links_by_xy(graph):
     if "links_at_patch" in graph.ds:
         remap_graph_element_ignore(
             graph.links_at_patch.reshape((-1,)),
-            as_id_array(np.argsort(sorted_links)),
+            as_id_array(np.argsort(sorted_links, kind="stable")),
             -1,
         )
 
@@ -275,12 +275,14 @@ def reindex_nodes_by_xy(graph):
 
     if "nodes_at_link" in graph.ds:
         remap_graph_element(
-            graph.nodes_at_link.reshape((-1,)), as_id_array(np.argsort(sorted_nodes))
+            graph.nodes_at_link.reshape((-1,)),
+            as_id_array(np.argsort(sorted_nodes, kind="stable")),
         )
 
     if "nodes_at_patch" in graph.ds:
         remap_graph_element(
-            graph.nodes_at_patch.reshape((-1,)), as_id_array(np.argsort(sorted_nodes))
+            graph.nodes_at_patch.reshape((-1,)),
+            as_id_array(np.argsort(sorted_nodes, kind="stable")),
         )
 
     return sorted_nodes
@@ -566,7 +568,7 @@ def sort_spokes_at_hub_on_graph(graph, spoke=None, at="node", inplace=False):
         plural = "patches"
     else:
         plural = spoke + "s"
-    spokes_at_hub = getattr(graph, "{plural}_at_{hub}".format(plural=plural, hub=at))
+    spokes_at_hub = getattr(graph, f"{plural}_at_{at}")
 
     if inplace:
         out = spokes_at_hub
@@ -615,7 +617,7 @@ def argsort_spokes_at_hub_on_graph(graph, spoke=None, at="node"):
     angles[angles < 0] += np.pi
 
     n_hubs, n_spokes = angles.shape
-    ordered_angles = np.argsort(angles)
+    ordered_angles = np.argsort(angles, kind="stable")
     ordered_angles += np.arange(n_hubs).reshape((-1, 1)) * n_spokes
 
     return as_id_array(ordered_angles)
@@ -661,13 +663,13 @@ def calc_angle_of_spoke_on_graph(graph, spoke=None, at="node", badval=None):
            [   0.,   nan,  180.,  270.],
            [  nan,   nan,  180.,  270.]])
     """
-    xy_of_hub = getattr(graph, "xy_of_{hub}".format(hub=at))
-    xy_of_spoke = getattr(graph, "xy_of_{spoke}".format(spoke=spoke))
+    xy_of_hub = getattr(graph, f"xy_of_{at}")
+    xy_of_spoke = getattr(graph, f"xy_of_{spoke}")
     if spoke == "patch":
         plural = "patches"
     else:
         plural = spoke + "s"
-    spokes_at_hub = getattr(graph, "{plural}_at_{hub}".format(plural=plural, hub=at))
+    spokes_at_hub = getattr(graph, f"{plural}_at_{at}")
 
     angle_of_spoke = calc_angle_of_spoke(
         spokes_at_hub, xy_of_hub, xy_of_spoke, badval=badval
@@ -692,7 +694,7 @@ def argsort_spokes_at_hub(spokes_at_hub, xy_of_hub, xy_of_spokes):
     angles[angles < 0] += np.pi
 
     n_hubs, n_spokes = angles.shape
-    ordered_angles = np.argsort(angles)
+    ordered_angles = np.argsort(angles, kind="stable")
     ordered_angles += np.arange(n_hubs).reshape((-1, 1)) * n_spokes
 
     return as_id_array(ordered_angles)

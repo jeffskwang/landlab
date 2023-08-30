@@ -102,9 +102,7 @@ Creating a Grid
 
 Creating a grid is easy.  The first step is to import Landlab's
 :py:class:`RasterModelGrid <landlab.grid.raster.RasterModelGrid>` class (this
-assumes you have :ref:`installed Landlab <install>`
-and are working in your favorite
-:ref:`Python environment <python_installation>`):
+assumes you have :ref:`installed Landlab <install>`)
 
 .. code-block:: python
 
@@ -554,9 +552,13 @@ general types. The class hierarchy is given in the second column, **Inherits fro
 +-------------------------+-------------------------+--------------------+-------------------+
 | ``VoronoiDelaunayGrid`` | ``ModelGrid``           | Delaunay triangles | Voronoi polygons  |
 +-------------------------+-------------------------+--------------------+-------------------+
+| ``FramedVoronoiGrid``   | ``VoronoiDelaunayGrid`` | Delaunay triangles | Voronoi polygons  |
++-------------------------+-------------------------+--------------------+-------------------+
 | ``HexModelGrid``        | ``VoronoiDelaunayGrid`` | triagonal          | hexagons          |
 +-------------------------+-------------------------+--------------------+-------------------+
 | ``RadialModelGrid``     | ``VoronoiDelaunayGrid`` | concentric         | Voronoi polygons  |
++-------------------------+-------------------------+--------------------+-------------------+
+| ``NetworkModelGrid``    | ``ModelGrid``           | ad libitum         | No cells          |
 +-------------------------+-------------------------+--------------------+-------------------+
 
 :py:class:`landlab.grid.raster.RasterModelGrid <landlab.grid.raster.RasterModelGrid>`
@@ -567,6 +569,8 @@ a set of node coordinates
 is given as an initial condition.
 Landlab then forms a Delaunay triangulation, so that the links between nodes are the
 edges of the triangles, and the cells are Voronoi polygons.
+A :py:class:`landlab.grid.framed_voronoi.FramedVoronoiGrid <landlab.grid.framed_voronoi.FramedVoronoiGrid>`
+is Voronoi grid where nodes coordinates are randomly moved from an initial rectangular regular grid.
 A :py:class:`landlab.grid.hex.HexModelGrid <landlab.grid.hex.HexModelGrid>` is a
 special type of VoronoiDelaunayGrid in which the Voronoi cells happen to be
 regular hexagons.
